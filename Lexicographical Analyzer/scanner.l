@@ -1,7 +1,12 @@
 
 %{
 
-/* Phase 1 - Mixalis Metzogiannakis-Giost - CSD3998 */
+/** Phase 1: Lexicographical Analyzer
+
+    Authors: Mixalis Metzogiannakis - csd3998
+             Spiros Papadomanolakis - csd5108
+             Giannis Manassakis     - csd5277
+  */
 
 
 #define YY_DECL int alpha_yylex (void* ylval)
@@ -140,74 +145,76 @@ int create_token(char * token_type, char * content, int line, int token_num, cha
     
     return 1;
 }
-int string_reader(){
+
+int string_reader() {
     char *buffer;
     buffer = (char *)malloc(max_string_size* sizeof(char));  // Allocate memory for buffer
 
-    char last_char = input();
     char ch;
     int i = 0;
-    int last_loop_special = 0;
-    buffer[0]='\0';
+    int reading_escaped_character = 0;
 
-    if (last_char == '\"') {  // If we are starting right after a closing double quote, return
-        create_token("String" , buffer,yylineno , count , buffer , "<-char*");
-        return 0;
-    }
 
     while ((ch = input())) {
-        if (last_char == '\\') {  // Handle escape sequences
+
+        if(!reading_escaped_character) {
+            if(ch == '\\') {
+                reading_escaped_character = 1;
+                continue;
+            }
+
+            if (ch == '\"') {  // End of string found
+                buffer[i] = '\0';  // Null-terminate the string
+
+                create_token("String" , buffer, yylineno , count , buffer , "<-char*");
+                free(buffer);  // Free memory of buffer
+                return 1; // Return 1 as successful string reading
+            }
+
+            buffer[i++] = ch;
+        } else {
             switch (ch) {
                 case 'n':
                     buffer[i++] = '\n';  
-                    break;
+                break;
+
                 case '\\':
                     buffer[i++] = '\\'; 
-                    break;
+                break;
+
                 case 't':
                     buffer[i++] = '\t'; 
-                    break;
+                break;
+
                 case '\"':
                     buffer[i++] = '\"'; 
-                    break;
+                break;
+
                 case '\'':
                     buffer[i++] = '\''; 
-                    break;
+                break;
 
                 default:
-                    printf("this string contains invalid characters\n");
+                    perror("Error! This string contains invalid escape characters\n");
                     free(buffer);
                     return -1;
-                    break;
-            }
-            last_char = '\0';  
-            last_loop_special = 1;  // Flag that special handling occurred
+                break;
 
-        } else if (ch == '\"') {  // End of string found
-            buffer[i] = last_char;
-            i++;
-            buffer[i] = '\0';  // Null-terminate the string
-           // int create_token(char * token_type, char * content, int line, int token_num, char * general_form, char * subcategory);
-
-            create_token("String" , buffer,yylineno , count , buffer , "<-char*");
-            free(buffer);  // Free memory for buffer
-            return 1;
-
-        } else {  // Regular character handling
-            if (last_loop_special == 0) {
-                buffer[i++] = last_char;
-            }
-            last_loop_special = 0;  // Reset the special flag
-            last_char = ch;
         }
+
+        /* End of reading escaped character */
+        reading_escaped_character = 0;
+
+        }
+
     }
 
-    // In case where we reach EOF without finding another quote
-    buffer[i] = '\0';
-    printf("end of file reached and string did not close \n" );
+    // In case we reach EOF without finding another quote
+    fprintf(stderr, "Error! Token #%d is unclosed string.\n", count);
     free(buffer);
-    return -1;
+    exit(0);
 }
+
 int comment_reader(int depth) {
     char *buffer;
     char ch;
@@ -276,7 +283,7 @@ int single_line_comment_reader(){
 
 int main(int argc, char *argv[]) {
 
-    int k =0;
+    int k = 0;
     
     if (argc > 1) {
         file = fopen(argv[1], "r");
@@ -287,7 +294,6 @@ int main(int argc, char *argv[]) {
 
         yyin = file;  // Set Flex input to the opened file
     }
-    //while(yylex()>0);
     
     void* ylval = NULL;  
     while (alpha_yylex(ylval) > 0);
@@ -302,4 +308,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
