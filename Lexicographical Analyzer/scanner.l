@@ -153,7 +153,7 @@ int string_reader() {
     char ch;
     int i = 0;
     int reading_escaped_character = 0;
-
+    
 
     while ((ch = input())) {
 
@@ -164,9 +164,9 @@ int string_reader() {
             }
 
             if (ch == '\"') {  // End of string found
-                buffer[i] = '\0';  // Null-terminate the string
+                buffer[i] = '\0'; // Null-terminate the string
 
-                create_token("String" , buffer, yylineno , count , buffer , "<-char*");
+                create_token("String" , buffer, yylineno , count , buffer, "<-char*");
                 free(buffer);  // Free memory of buffer
                 return 1; // Return 1 as successful string reading
             }
@@ -195,15 +195,15 @@ int string_reader() {
                 break;
 
                 default:
-                    perror("Error! This string contains invalid escape characters\n");
+                    fprintf(stderr, "Error! Token #%d is a string which contains invalid escape characters\n", count);
                     free(buffer);
-                    return -1;
+                    exit(1);
                 break;
 
         }
 
-        /* End of reading escaped character */
-        reading_escaped_character = 0;
+            /* End of reading escaped character */
+            reading_escaped_character = 0;
 
         }
 
@@ -212,7 +212,7 @@ int string_reader() {
     // In case we reach EOF without finding another quote
     fprintf(stderr, "Error! Token #%d is unclosed string.\n", count);
     free(buffer);
-    exit(0);
+    exit(1);
 }
 
 int comment_reader(int depth) {
@@ -254,6 +254,7 @@ int comment_reader(int depth) {
     free(buffer); // Free memory before exiting
     return -1; // Return error if EOF reached without closing comment
 }
+
 int single_line_comment_reader(){
     char *buffer;
     buffer = (char *)malloc(max_string_size* sizeof(char));  
@@ -263,20 +264,14 @@ int single_line_comment_reader(){
     
     while ((ch = input())) {
         if(ch=='\n'){
-            buffer[i]='\0';
-            create_token("SINGLE_LINE_COMMENT" , buffer,yylineno , count , buffer , "<-char*");
-            free(buffer);
-            return 1;
-            
-        }else{
-            buffer[i]=ch;
-            i++;
+            break;
         }
-        
-         
+
+        buffer[i++] = ch;
     }
     
-    create_token("SINGLE_LINE_COMMENT" , buffer,yylineno , count , buffer , "<-char*");
+    buffer[i] = '\0';
+    create_token("SINGLE_LINE_COMMENT" , buffer, yylineno , count , buffer , "<-char*");
     free(buffer);
     return 1;
 }
