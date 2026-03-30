@@ -1,5 +1,5 @@
 Phase 1 - Lexicographical Analysis
-
+#small comment to test git on linux 
 Authors:
     Mixalis Metzogiannakis - csd3998
     Spiros Papadomanolakis - csd5108
