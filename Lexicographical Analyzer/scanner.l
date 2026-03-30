@@ -11,7 +11,6 @@
 
 #define YY_DECL int alpha_yylex (void* ylval)
 int count = 1; //number of current token
-int max_string_size = 700;
 FILE *file;  // Declare a file pointer to handle input files
 
 int string_reader();
@@ -147,8 +146,9 @@ int create_token(char * token_type, char * content, int line, int token_num, cha
 }
 
 int string_reader() {
+    int buffer_size = 500;
     char *buffer;
-    buffer = (char *)malloc(max_string_size* sizeof(char));  // Allocate memory for buffer
+    buffer = (char *)malloc(buffer_size* sizeof(char));  // Allocate memory for buffer
 
     char ch;
     int i = 0;
@@ -158,6 +158,19 @@ int string_reader() {
     while ((ch = input())) {
 
         if(!reading_escaped_character) {
+            #realloc buffer if full
+            if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
+                if (newbuffer == NULL){
+                    free(buffer);
+                    return 0;
+                }
+                
+                buffer = newbuffer;
+            }
+            
+
             if(ch == '\\') {
                 reading_escaped_character = 1;
                 continue;
@@ -218,7 +231,8 @@ int string_reader() {
 int comment_reader(int depth) {
     char *buffer;
     char ch;
-    buffer = (char *)malloc(max_string_size* sizeof(char)); // Allocate space for buffer
+    int buffer_size = 500;
+    buffer = (char *)malloc(buffer_size* sizeof(char)); // Allocate space for buffer
     buffer[0] = '\0'; // Null-terminate the buffer initially
     char last_char = input();
     int i = 0;
@@ -243,6 +257,17 @@ int comment_reader(int depth) {
             return 0; // End the comment reader
         } else {
             // Append the previous character to the buffer
+
+            if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
+                if (newbuffer == NULL){
+                    free(buffer);
+                    return 0;
+                }
+                
+                buffer = newbuffer;
+            }
             buffer[i] = last_char;
             i++;
             buffer[i] = '\0'; // Null-terminate buffer
@@ -256,8 +281,9 @@ int comment_reader(int depth) {
 }
 
 int single_line_comment_reader(){
+    int buffer_size = 500;
     char *buffer;
-    buffer = (char *)malloc(max_string_size* sizeof(char));  
+    buffer = (char *)malloc(buffer_size* sizeof(char));  
     buffer[0]='\0';
     char ch;
     int i = 0;
@@ -266,8 +292,18 @@ int single_line_comment_reader(){
         if(ch=='\n'){
             break;
         }
-
+        if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
+                if (newbuffer == NULL){
+                    free(buffer);
+                    return 0;
+                }
+                
+                buffer = newbuffer;
+            }
         buffer[i++] = ch;
+
     }
     
     buffer[i] = '\0';
