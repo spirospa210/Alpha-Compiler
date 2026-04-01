@@ -1,6 +1,7 @@
 %{
 
-/** Phase 1 & 2: Lexical Analyzer
+/** Phase 1: Lexicographical Analyzer
+
     Authors: Mixalis Metzogiannakis - csd3998
              Spiros Papadomanolakis - csd5108
              Giannis Manassakis     - csd5277
@@ -9,12 +10,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "symtable.h"
-#include "parser.tab.h"
 
+#define YY_DECL int alpha_yylex (void* ylval)
 int count = 1; //number of current token
+FILE *file;  // Declare a file pointer to handle input files
 
-char* string_reader();
+int string_reader();
 int comment_reader(int depth);
 int single_line_comment_reader();
 
@@ -29,88 +30,75 @@ struct token{
 };
 
 int create_token(char * token_type, char * content, int line, int token_num, char * general_form, char * subcategory);
+
 void print_tokens();
 
 struct token * head = NULL;
 struct token * tail = NULL;
 %}
 
-%option noyywrap
 %option yylineno
-
+%option noyywrap
 %%
 
-\"      { 
-            char* str = string_reader(); 
-            yylval.strVal = str; 
-            return STRING; 
-        }
-"/*"    { comment_reader(0); }
-"//"    { single_line_comment_reader(); }
-\n      { /* yylineno is incremented automatically */ }
+\"      { string_reader(); }
+"/*"   { comment_reader(0); }
+"//"    {single_line_comment_reader();}
+\n     { /* yylineno is incremented automatically */ }
 
-"if"       { create_token("KEYWORD", "if", yylineno, count, "IF", "<-enumerated"); return IF; }
-"else"     { create_token("KEYWORD", "else", yylineno, count, "ELSE", "<-enumerated"); return ELSE; }
-"while"    { create_token("KEYWORD", "while", yylineno, count, "WHILE", "<-enumerated"); return WHILE; }
-"for"      { create_token("KEYWORD", "for", yylineno, count, "FOR", "<-enumerated"); return FOR; }
-"function" { create_token("KEYWORD", "function", yylineno, count, "FUNCTION", "<-enumerated"); return FUNCTION; }
-"return"   { create_token("KEYWORD", "return", yylineno, count, "RETURN", "<-enumerated"); return RETURN; }
-"break"    { create_token("KEYWORD", "break", yylineno, count, "BREAK", "<-enumerated"); return BREAK; }
-"continue" { create_token("KEYWORD", "continue", yylineno, count, "CONTINUE", "<-enumerated"); return CONTINUE; }
-"and"      { create_token("KEYWORD", "and", yylineno, count, "AND", "<-enumerated"); return AND; }
-"not"      { create_token("KEYWORD", "not", yylineno, count, "NOT", "<-enumerated"); return NOT; }
-"or"       { create_token("KEYWORD", "or", yylineno, count, "OR", "<-enumerated"); return OR; }
-"local"    { create_token("KEYWORD", "local", yylineno, count, "LOCAL", "<-enumerated"); return LOCAL; }
-"true"     { create_token("KEYWORD", "true", yylineno, count, "TRUE", "<-enumerated"); return TRUE_TOKEN; }
-"false"    { create_token("KEYWORD", "false", yylineno, count, "FALSE", "<-enumerated"); return FALSE_TOKEN; }
-"nil"      { create_token("KEYWORD", "nil", yylineno, count, "NIL", "<-enumerated"); return NIL; }
 
-"="     { create_token("OPERATOR", "=", yylineno, count, "OPERATOR ASSIGN", "<-enumerated"); return '='; }
-"+"     { create_token("OPERATOR", "+", yylineno, count, "OPERATOR PLUS", "<-enumerated"); return '+'; }
-"-"     { create_token("OPERATOR", "-", yylineno, count, "OPERATOR MINUS", "<-enumerated"); return '-'; }
-"*"     { create_token("OPERATOR", "*", yylineno, count, "OPERATOR MULTIPLYCATION", "<-enumerated"); return '*'; }
-"/"     { create_token("OPERATOR", "/", yylineno, count, "OPERATOR DIV", "<-enumerated"); return '/'; }
-"%"     { create_token("OPERATOR", "%", yylineno, count, "OPERATOR MOD", "<-enumerated"); return '%'; }
-"=="    { create_token("OPERATOR", "==", yylineno, count, "OPERATOR EQUAL", "<-enumerated"); return EQUAL_EQUAL; }
-"!="    { create_token("OPERATOR", "!=", yylineno, count, "OPERATOR NOT EQUAL", "<-enumerated"); return NOT_EQUAL; }
-"++"    { create_token("OPERATOR", "++", yylineno, count, "OPERATOR PLUS_PLUS", "<-enumerated"); return PLUS_PLUS; }
-"--"    { create_token("OPERATOR", "--", yylineno, count, "OPERATOR MINUS_ONE", "<-enumerated"); return MINUS_MINUS; }
-">"     { create_token("OPERATOR", ">", yylineno, count, "OPERATOR BIGGER", "<-enumerated"); return '>'; }
-"<"     { create_token("OPERATOR", "<", yylineno, count, "OPERATOR SMALLER", "<-enumerated"); return '<'; }
-">="    { create_token("OPERATOR", ">=", yylineno, count, "OPERATOR GREATER_EQUAL", "<-enumerated"); return GREATER_EQUAL; }
-"<="    { create_token("OPERATOR", "<=", yylineno, count, "OPERATOR SMALLER_EQUAL", "<-enumerated"); return LESS_EQUAL; }
+"if"   { create_token("KEYWORD", "if", yylineno, count, "IF", "<-enumerated"); }
+"else"   { create_token("KEYWORD", "else", yylineno, count, "ELSE", "<-enumerated"); }
+"while"   { create_token("KEYWORD", "while", yylineno, count, "WHILE", "<-enumerated"); }
+"for"   { create_token("KEYWORD", "for", yylineno, count, "FOR", "<-enumerated"); }
+"function"   { create_token("KEYWORD", "function", yylineno, count, "FUNCTION", "<-enumerated"); }
+"return"   { create_token("KEYWORD", "return", yylineno, count, "RETURN", "<-enumerated"); }
+"break"   { create_token("KEYWORD", "break", yylineno, count, "BREAK", "<-enumerated"); }
+"continue"   { create_token("KEYWORD", "continue", yylineno, count, "CONTINUE", "<-enumerated"); }
+"and"   { create_token("KEYWORD", "and", yylineno, count, "AND", "<-enumerated"); }
+"not"   { create_token("KEYWORD", "not", yylineno, count, "NOT", "<-enumerated"); }
+"or"   { create_token("KEYWORD", "or", yylineno, count, "OR", "<-enumerated"); }
+"local"   { create_token("KEYWORD", "local", yylineno, count, "LOCAL", "<-enumerated"); }
+"true"   { create_token("KEYWORD", "true", yylineno, count, "TRUE", "<-enumerated"); }
+"false"   { create_token("KEYWORD", "false", yylineno, count, "FALSE", "<-enumerated"); }
+"nil"   { create_token("KEYWORD", "nil", yylineno, count, "NIL", "<-enumerated"); }
 
-"{"     { create_token("PUNCTUATION", "{", yylineno, count, "OPEN_CURLY_BRACKET", "<-enumerated"); return '{'; }
-"}"     { create_token("PUNCTUATION", "}", yylineno, count, "CLOSE_CURLY_BRACKET", "<-enumerated"); return '}'; }
-"["     { create_token("PUNCTUATION", "[", yylineno, count, "OPEN_BRACKET", "<-enumerated"); return '['; }
-"]"     { create_token("PUNCTUATION", "]", yylineno, count, "CLOSE_BRACKET", "<-enumerated"); return ']'; }
-"("     { create_token("PUNCTUATION", "(", yylineno, count, "OPEN_PARENTHESIS", "<-enumerated"); return '('; }
-")"     { create_token("PUNCTUATION", ")", yylineno, count, "CLOSE_PARENTHESIS", "<-enumerated"); return ')'; }
-";"     { create_token("PUNCTUATION", ";", yylineno, count, "SEMICOLUMN", "<-enumerated"); return ';'; }
-","     { create_token("PUNCTUATION", ",", yylineno, count, "COMA", "<-enumerated"); return ','; }
-":"     { create_token("PUNCTUATION", ":", yylineno, count, "COLUMN", "<-enumerated"); return ':'; }
-"::"    { create_token("PUNCTUATION", "::", yylineno, count, "DOUBLE_COLUMN", "<-enumerated"); return GLOBAL_SCOPE; }
-"."     { create_token("PUNCTUATION", ".", yylineno, count, "PERIOD", "<-enumerated"); return '.'; }
-".."    { create_token("PUNCTUATION", "..", yylineno, count, "DOUBLE_PERIOD", "<-enumerated"); return DOT_DOT; }
 
-[0-9]+              { 
-                        create_token("CONST_INT", yytext, yylineno, count, yytext, "<-integer");
-                        yylval.strVal = strdup(yytext);
-                        return NUMBER;
-                    }   
-[0-9]+\.[0-9]+      { 
-                        create_token("CONST_REAL", yytext, yylineno, count, yytext, "<-float"); 
-                        yylval.strVal = strdup(yytext);
-                        return NUMBER;
-                    } 
-[a-zA-Z][a-zA-Z0-9_]* { 
-                        create_token("IDENT", yytext, yylineno, count, yytext, "<-char *");  
-                        yylval.strVal = strdup(yytext);
-                        return ID;
-                    }
+"="   { create_token("OPERATOR", "=", yylineno, count, "OPERATOR ASSIGN", "<-enumerated"); }
+"+"   { create_token("OPERATOR", "+", yylineno, count, "OPERATOR PLUS", "<-enumerated"); }
+"-"   { create_token("OPERATOR", "-", yylineno, count, "OPERATOR MINUS", "<-enumerated"); }
+"*"   { create_token("OPERATOR", "*", yylineno, count, "OPERATOR MULTIPLYCATION", "<-enumerated"); }
+"/"   { create_token("OPERATOR", "/", yylineno, count, "OPERATOR DIV", "<-enumerated"); }
+"%"   { create_token("OPERATOR", "%", yylineno, count, "OPERATOR MOD", "<-enumerated"); }
+"=="   { create_token("OPERATOR", "==", yylineno, count, "OPERATOR EQUAL", "<-enumerated"); }
+"!="   { create_token("OPERATOR", "!=", yylineno, count, "OPERATOR NOT EQUAL", "<-enumerated"); }
+"++"   { create_token("OPERATOR", "++", yylineno, count, "OPERATOR PLUS_PLUS", "<-enumerated"); }
+"--"   { create_token("OPERATOR", "--", yylineno, count, "OPERATOR MINUS_ONE", "<-enumerated"); }
+">"   { create_token("OPERATOR", ">", yylineno, count, "OPERATOR BIGGER", "<-enumerated"); }
+"<"   { create_token("OPERATOR", "<", yylineno, count, "OPERATOR SMALLER", "<-enumerated"); }
+">="   { create_token("OPERATOR", ">=", yylineno, count, "OPERATOR GREATER_EQUAL", "<-enumerated"); }
+"<="   { create_token("OPERATOR", "<=", yylineno, count, "OPERATOR SMALLER_EQUAL", "<-enumerated"); }
 
-[ \t\r]+  { /*Do nothing*/ }
-.      { printf("INVALID CHARACTER: %s, STOPPING EXECUTION\n", yytext); return 0; }
+
+"{"   { create_token("PUNCTUATION", "{", yylineno, count, "OPEN_CURLY_BRACKET", "<-enumerated"); }
+"}"   { create_token("PUNCTUATION", "}", yylineno, count, "CLOSE_CURLY_BRACKET", "<-enumerated"); }
+"["   { create_token("PUNCTUATION", "[", yylineno, count, "OPEN_BRACKET", "<-enumerated"); }
+"]"   { create_token("PUNCTUATION", "]", yylineno, count, "CLOSE_BRACKET", "<-enumerated"); }
+"("   { create_token("PUNCTUATION", "(", yylineno, count, "OPEN_PARENTHESIS", "<-enumerated"); }
+")"   { create_token("PUNCTUATION", ")", yylineno, count, "CLOSE_PARENTHESIS", "<-enumerated"); }
+";"   { create_token("PUNCTUATION", ";", yylineno, count, "SEMICOLUMN", "<-enumerated"); }
+","   { create_token("PUNCTUATION", ",", yylineno, count, "COMA", "<-enumerated"); }
+":"   { create_token("PUNCTUATION", ":", yylineno, count, "COLUMN", "<-enumerated"); }
+"::"   { create_token("PUNCTUATION", "::", yylineno, count, "DOUBLE_COLUMN", "<-enumerated"); }
+"."   { create_token("PUNCTUATION", ".", yylineno, count, "PERIOD", "<-enumerated"); }
+".."   { create_token("PUNCTUATION", "..", yylineno, count, "DOUBLE_PERIOD", "<-enumerated"); }
+
+[0-9]+              { create_token("CONST_INT", yytext ,yylineno, count, yytext, "<-integer");}   /* Match an integer */
+[0-9]+\.[0-9]+      { create_token("CONST_REAL", yytext ,yylineno, count, yytext, "<-float"); }  /* Match a real number */
+[a-zA-Z][a-zA-Z0-9_]* { create_token("IDENT", yytext ,yylineno, count, yytext, "<-char *");  }
+" "   { /*Do nothing*/ }
+[ \t\r\v\f]+ { /* Ignore other whitespace */ }
+.      {printf("INVALID CHARACTERS, STOPPING EXECUTION\n"); return 0; /* do nothing */ }
 %%
 
 void print_tokens() {
@@ -118,6 +106,7 @@ void print_tokens() {
     temp = head;
     int i =1;
     while(temp != NULL){
+        //printf("Token %d: Type:%s, Content:%s\n",i,temp->token_type,temp->content);
         printf("%d: #%d \"%s\" %s %s %s\n",temp->line, temp->token_num, temp->content, temp->token_type, temp->general_form, temp->subcategory);
         i++;
         temp = temp->next;
@@ -149,58 +138,90 @@ int create_token(char * token_type, char * content, int line, int token_num, cha
             temp2 = temp2->next;
         }
         temp2->next = temp;
+
     }
+    
     return 1;
 }
 
-char* string_reader() {
+int string_reader() {
     int buffer_size = 500;
-    char *buffer = (char *)malloc(buffer_size * sizeof(char));
+    char *buffer;
+    buffer = (char *)malloc(buffer_size* sizeof(char));  // Allocate memory for buffer
 
     char ch;
     int i = 0;
     int reading_escaped_character = 0;
+    
 
     while ((ch = input())) {
+
         if(!reading_escaped_character) {
-            if (buffer_size <= i + 1){
-                buffer_size += 500;
-                char *newbuffer = realloc(buffer, buffer_size);
+            //realloc buffer if full
+            if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
                 if (newbuffer == NULL){
                     free(buffer);
-                    return NULL;
+                    return 0;
                 }
+                
                 buffer = newbuffer;
             }
+            
 
             if(ch == '\\') {
                 reading_escaped_character = 1;
                 continue;
             }
 
-            if (ch == '\"') {
-                buffer[i] = '\0';
+            if (ch == '\"') {  // End of string found
+                buffer[i] = '\0'; // Null-terminate the string
+
                 create_token("String" , buffer, yylineno , count , buffer, "<-char*");
-                return buffer; // Modified to return the string directly for yylval
+                free(buffer);  // Free memory of buffer
+                return 1; // Return 1 as successful string reading
             }
 
             buffer[i++] = ch;
         } else {
             switch (ch) {
-                case 'n': buffer[i++] = '\n'; break;
-                case '\\': buffer[i++] = '\\'; break;
-                case 't': buffer[i++] = '\t'; break;
-                case '\"': buffer[i++] = '\"'; break;
-                case '\'': buffer[i++] = '\''; break;
+                case 'n':
+                    buffer[i++] = '\n';  
+                break;
+
+                case '\\':
+                    buffer[i++] = '\\'; 
+                break;
+
+                case 't':
+                    buffer[i++] = '\t'; 
+                break;
+
+                case '\"':
+                    buffer[i++] = '\"'; 
+                break;
+
+                case '\'':
+                    buffer[i++] = '\''; 
+                break;
+
                 default:
                     fprintf(stderr, "Error! Token #%d is a string which contains invalid escape characters\n", count);
                     free(buffer);
                     exit(1);
-            }
-            reading_escaped_character = 0;
+                break;
+
         }
+
+            /* End of reading escaped character */
+            reading_escaped_character = 0;
+
+        }
+
     }
 
+    // In case we reach EOF without finding another quote
     fprintf(stderr, "Error! Token #%d is unclosed string.\n", count);
     free(buffer);
     exit(1);
@@ -210,44 +231,52 @@ int comment_reader(int depth) {
     char *buffer;
     char ch;
     int buffer_size = 500;
-    buffer = (char *)malloc(buffer_size* sizeof(char));
-    buffer[0] = '\0';
+    buffer = (char *)malloc(buffer_size* sizeof(char)); // Allocate space for buffer
+    buffer[0] = '\0'; // Null-terminate the buffer initially
     char last_char = input();
     int i = 0;
     int starting_point = yylineno;
 
+    // Read the file character by character
     while ((ch = input())) {
         if (last_char == '/' && ch == '*') {
-            comment_reader(depth + 1);
-            last_char = input();
+            // Found the start of a nested comment
+            comment_reader(depth + 1); // Recursively call for nested comment
+            last_char = input(); // Continue after nested comment
         } else if (last_char == '*' && ch == '/') {
+            // End of the comment found
+            
             if (depth == 0){
                 create_token("MULTI_COMMENT", buffer ,starting_point, count, buffer, "<-enumerated");
-            } else {
+
+            }else{
                 create_token("NESTED_COMMENT", buffer ,starting_point, count, buffer, "<-enumerated");
             }
-            free(buffer);
-            return 0;
+            free(buffer); // Free allocated memory
+            return 0; // End the comment reader
         } else {
-            if (buffer_size <= i + 1){
-                buffer_size += 500;
-                char *newbuffer = realloc(buffer, buffer_size);
+            // Append the previous character to the buffer
+
+            if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
                 if (newbuffer == NULL){
                     free(buffer);
                     return 0;
                 }
+                
                 buffer = newbuffer;
             }
             buffer[i] = last_char;
             i++;
-            buffer[i] = '\0';
-            last_char = ch;
+            buffer[i] = '\0'; // Null-terminate buffer
+            last_char = ch; // Move to the next character
         }
     }
 
     printf("Error: Comment not properly closed.\n");
-    free(buffer);
-    return -1;
+    free(buffer); // Free memory before exiting
+    return -1; // Return error if EOF reached without closing comment
 }
 
 int single_line_comment_reader(){
@@ -259,19 +288,21 @@ int single_line_comment_reader(){
     int i = 0;
     
     while ((ch = input())) {
-        if(ch == '\n' || ch == EOF){
+        if(ch=='\n'){
             break;
         }
-        if (buffer_size <= i + 1){
-                buffer_size += 500;
-                char *newbuffer = realloc(buffer, buffer_size);
+        if (buffer_size<=i){
+                buffer_size = buffer_size + 500;
+                char *newbuffer= realloc(buffer,buffer_size);
                 if (newbuffer == NULL){
                     free(buffer);
                     return 0;
                 }
+                
                 buffer = newbuffer;
             }
         buffer[i++] = ch;
+
     }
     
     buffer[i] = '\0';
