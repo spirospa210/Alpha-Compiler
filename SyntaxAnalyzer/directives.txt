@@ -1,0 +1,1081 @@
+Authors:
+
+1) Mixalis Metzogiannakis	csd3998
+2) Spiros Papadomanolakis	csd5108
+3) Giannis Manassakis		csd5277
+
+
+We used Gemini 3.1 Pro to generate the code of our project.
+
+We had two chats in two different sessions to fix the bugs of the AI generated code.
+
+Unfortunately, we lost the first chat because we had the "save chats" feature turned off.
+However, I managed to save the first and most significant prompt of the first chat, which is:
+
+
+
+
+"
+
+I want a syntax analyzer written in C, that:
+
+It prints to the output the grammar rules as they are "reduced" each time during the syntactic analysis (parsing).
+
+It maintains an appropriate symbol table (e.g., for variables and functions).
+
+At the end of the syntactic analysis, it prints the symbol table (therefore, you should not "free" any symbols—we are creating a two-phase compiler), listing:
+
+    The name of each symbol.
+
+    Its type (e.g., variable, formal function argument, user-defined function, library function).
+
+    The line of definition (1st occurrence) in the code (0 for library functions).
+
+    Its scope (e.g., local or global).
+
+
+
+Grammar
+
+The grammar of the alpha language is provided below. The symbols * and | have the same meaning as in regular expressions, while content enclosed in [ and ] denotes that it is optional (caution: do not confuse these with the literal tokens [ and ]).
+
+program → stmt*
+
+stmt → expr ;
+             ∣ ifstmt
+             ∣ whilestmt
+             ∣ forstmt
+             ∣ returnstmt
+             ∣ break ;
+             ∣ continue ;
+             ∣ block
+             ∣ funcdef
+             ∣ ;
+
+expr → assignexpr
+             ∣ expr op expr
+             ∣ term
+
+op → + | - | * | / | % | > | >= | < | <= | == | != | and | or
+
+term → ( expr )
+             ∣ - expr
+             ∣ not expr
+
+| ++lvalue
+| lvalue++
+| --lvalue
+| lvalue--
+| primary
+
+assignexpr → lvalue = expr
+
+primary → lvalue
+             ∣ call
+             ∣ objectdef
+             ∣ ( funcdef )
+             ∣ const
+
+lvalue → id
+             ∣ local id
+             ∣ :: id (Global scope access)
+             ∣ member
+
+member → lvalue . id
+             ∣ lvalue [ expr ]
+             ∣ call . id
+             ∣ call [ expr ]
+
+call → call ( elist )
+             ∣ lvalue callsuffix
+             ∣ ( funcdef ) ( elist )
+
+callsuffix → normcall ∣ methodcall
+
+normcall → ( elist )
+
+methodcall → .. id ( elist ) // equivalent to lvalue.id(lvalue, elist)
+
+elist → [ expr [, expr]* ]
+
+objectdef → [ [elist | indexed] ]
+
+indexed → [ indexedelem [, indexedelem]* ]
+
+indexedelem → { expr : expr }
+
+block → { [stmt*] }
+
+funcdef → function [id] ( idlist ) block
+
+const → number | string | nil | true | false
+
+idlist → [ id [, id]* ]
+
+ifstmt → if ( expr ) stmt [ else stmt ]
+
+whilestmt → while ( expr ) stmt
+
+forstmt → for ( elist ; expr ; elist ) stmt
+
+returnstmt → return [ expr ] ;
+
+
+
+1. Precedence and Associativity Rules
+Precedence (High to Low)	Operators
+1	(), [] (Function call, Array/Object access)
+2	. , .. (Member access, Method call)
+3	not, ++, --, - (Unary operators)
+4	*, /, % (Multiplicative)
+5	+, - (Additive)
+6	>, >=, <, <= (Relational)
+7	==, != (Equality)
+8	and (Logical AND)
+9	or (Logical OR)
+10	= (Assignment)
+
+Associativity:
+
+    None: >, >=, <, <=, ==, != (These cannot be chained like a < b < c).
+
+    Right: not, ++, --, -, =
+
+    Left: All other operators.
+
+2. Library Functions
+
+The following are predefined as "library function" types in the global scope. They cannot be shadowed or redefined by the user.
+
+    print, input
+
+    objectmemberkeys, objecttotalmembers, objectcopy
+
+    totalarguments, argument, typeof
+
+    strtonum, sqrt, cos, sin
+
+3. Scope Spaces and Visibility
+
+    Unified Namespace: Library functions, user functions, variables, and formal arguments all share the same namespace. Naming collisions will occur if they overlap in the same scope.
+
+    No Shadowing of Library Functions: You cannot define a variable or function with the same name as a library function.
+
+    Function Names as R-values: User-defined function names are constants; they cannot be used as l-values (assigned to).
+
+    Scope Levels: * Scope 0 (Global): Outside of any block or function.
+
+        Nesting: Entering a block or function definition (starting at the formal arguments' parentheses) increases scope by +1.
+
+        Note: A function's body block does not increase the scope again; it remains at the level of the formal arguments.
+
+    Deactivation: When exiting a scope, symbols are not deleted but "hidden" (marked as inactive).
+
+4. Symbol Access Rules (The "Alpha" Logic)
+
+A function has access only to:
+
+    Its own local variables and formal arguments.
+
+    Global variables (only those at Scope 0).
+
+    Any other functions currently in an active scope.
+
+    Crucial Rule: A nested function cannot access the local variables or formal arguments of its parent (enclosing) function. It only sees its own locals and the globals.
+
+5. Identifier Resolution Rules
+
+When an id is used:
+
+    Same Scope: If an active identifier A exists in the current scope, use it.
+
+        Constraint: You cannot redefine a variable as a function or vice versa in the same scope.
+
+    Enclosing Scope: If not in the current scope, look in outer scopes where access is legally permitted (following the rule above).
+
+    Creation: If not found, a new identifier A is created in the current scope.
+
+Specific Modifiers:
+
+    ::id (Global): Forces a search only in Scope 0. If not found, it is an error.
+
+    local id: Forces the search/creation only in the current scope. It prevents looking at outer scopes but will fail if it name-clashes with a library function.
+
+6. Symbol Table Categories
+
+For code generation purposes, you must store these three categories in your Symbol Table:
+
+    Global: (Scope 0)
+
+    Formal Arguments: (Function parameters)
+
+    Local Variables: (Scope > 0, excluding formal arguments)
+
+
+
+Important notes:
+
+1) What should the output be?
+
+Example:
+
+
+input:
+
+x = 2;
+function foo() {
+	function foo (bar) {
+		local foo = 2:
+		return bar + foo;
+	}
+	{
+		local foo = [(foo: [{foo: foo}]}]; 			  
+		foo.foo..foo(::foo);
+	}
+	x = (function(){});
+}
+
+
+output:
+
+-----------	Scope #0	-----------
+"print" [library function] (line 0) (scope 0) 
+"input" [library function] (line 0) (scope 0) 
+"objectmemberkeys" [library function] (line 0) (scope 0) 
+"objecttotalmembers" [library function] (line 0) (scope 0) 
+"objectcopy" [library function] (line 0) (scope 0) 
+"totalarguments" [library function] (line 0) (scope 0) 
+"argument" [library function] (line 0) (scope 0) 
+"typeof" [library function] (line 0) (scope 0) 
+"strtonum" [library function] (line 0) (scope 0) 
+"sqrt" [library function] (line 0) (scope 0) 
+"cos" [library function] (line 0) (scope 0) 
+"sin" [library function] (line 0) (scope 0)
+"x" [global variable] (line 1) (scope 0)
+"foo" [user function] (line 2) (scope 0)
+ 
+
+-----------	Scope #1	-----------
+"foo" [user function] (line 3) (scope 1) 
+"$0"  [user function] (line 11) (scope 1)
+
+-----------	Scope #2	-----------
+"bar" [formal argument] (line 3) (scope 2) 
+"foo" [local variable] (line 4) (scope 2) 
+"foo" [local variable] (line 8) (scope 2)
+
+
+2) Symbol Table Lookup
+
+To resolve a symbol encountered within a function, the search process follows these specific stages (stopping as soon as the symbol is found):
+
+Step 1: Local Scope Search
+Search within the local variables of the current scope (regardless of their specific type).
+
+Step 2: Formal Arguments Search
+Search within the formal arguments (parameters) of the current function.
+
+Step 3: Intermediate Scopes Search
+Search through all intermediate scopes (where 0<scope<current scope).
+
+    Crucial constraint: In these intermediate levels, the search is restricted only to functions defined there. As per your earlier rules, local variables from outer functions are not accessible to a nested function.
+
+Step 4: Global Scope Search
+Search the global scope (Scope 0) for all symbols of any type (variables, user functions, or library functions).
+If all the above steps fail:
+
+The symbol does not exist → it must be inserted.
+
+Special Case: ::symbol
+
+If a symbol is preceded by the :: token:
+
+    Search Constraint: The lookup is strictly performed in the global scope (Scope 0).
+
+    Outcome: If the symbol is not found in the global scope, it results in a compile-time error (e.g., "global symbol not found").
+
+Hash Table Implementation: Chaining
+
+
+3. Does syntactic analysis continue after an error?
+
+    Print an appropriate error message.
+
+    Continue analysis for the rest of the program.
+
+4. What happens if a funcdef fails?
+
+Example
+JavaScript
+
+f = 1;
+function f(a,b) 
+{
+    x = 5;
+}
+
+You may:
+
+    Continue syntactic analysis normally.
+
+    Analyze the arguments and the body.
+
+Simply:
+
+    Do not insert the function f into the symbol table (due to the error).
+
+
+5. Scope – Examples
+
+Example 1: Formal Arguments
+
+x = 9;
+function foo(x, y) {}
+
+Results:
+
+    x: variable at scope 0.
+
+    foo: function at scope 0.
+
+    x, y: formal arguments at scope 1.
+
+Example 2: Nested Functions
+
+
+{
+    {
+        function x() {}
+        function y() { x(); }
+    }
+}
+
+
+Variable accessibility from inner functions
+
+Case 1
+
+
+{
+y = 1;
+function ex(a){
+y = 3; // ERROR
+}
+}
+
+Error:
+Variable y is not accessible inside function ex.
+
+Case 2
+
+
+{
+y = 1;
+function ex(a){
+local y = 3; // OK
+}
+}
+
+Case 3
+
+
+{
+y = 1;
+function ex(a){
+::y = 3; // ERROR
+}
+}
+
+Error:
+Undefined global variable y.
+
+
+Global access from a nested function
+Απόσπασμα κώδικα
+
+1 x = 5
+2 function foo {
+3     ::x = 3;
+4     function g() {
+5         x = 9;
+6     }
+7 }
+
+Analysis for line 5:
+
+    Lookup in current scope (2) → not found
+
+    Lookup in scope 1 → not found
+
+    Lookup in scope 0 → found
+
+The variable is global and accessible.
+There is no error.
+General Rule
+
+For a "plain" variable (without :: or local):
+
+    Lookup in the current scope.
+
+    Lookup in outer scopes.
+
+    Up to the global scope.
+
+If found → we stop.
+Then, we check if access is permitted.
+
+6. Where are the Formal Arguments stored?
+
+Mandatory:
+
+    As formals in the Symbol Table.
+
+Optional:
+
+    As an additional field in the function's struct (to keep track of each function's arguments).
+
+
+7. Symbol Definitions
+
+When is it a variable and when is it a function?
+We follow the rules from Tutorial 3:
+
+    funcdef → declares a function.
+
+    Everything else → declares variables.
+
+In cases of simple reference:
+
+    The lookup determines whether it is a variable or a function.
+
+Case: something.id
+The id:
+
+    Is not entered into the symbol table.
+
+    Is not looked up.
+
+    Is ignored for the purpose of the symbol table.
+
+Example:
+Απόσπασμα κώδικα
+
+f = 5;
+f.x = 1;
+
+At this stage:
+
+    An error does not need to be thrown.
+
+    Generally, such errors are diagnosed dynamically (runtime), not statically.
+
+8. For Loop
+
+Is for(;;) valid?
+The rule is:
+forstmt → for (elist; expr; elist) stmt
+The expr cannot be empty.
+
+Therefore:
+for(;;) is not syntactically correct.
+9. Tables
+
+Are the following equivalent?
+
+    t = [{x:a},{y:b}];
+
+    t["x"] = a; t["y"] = b;
+
+No.
+In (1):
+
+    x and y are variables.
+
+    They are not strings.
+
+A roughly equivalent form would be:
+t = [{"x":a},{"y":b}];
+
+However:
+The semantics differ:
+
+    The first creates a new dynamic table.
+
+    The second modifies an existing table.
+
+Equivalent forms:
+t["x"] = a; is equivalent to t.x = a;
+In the second form:
+
+    x is not entered into the Symbol Table.
+
+    They are treated identically.
+
+10. Anonymous Functions
+
+Example:
+Απόσπασμα κώδικα
+
+function(a,b,c){}
+
+Requirements:
+
+    Must be treated like a regular function.
+
+    You must assign a name to it yourself (according to Tutorial 3).
+
+Call Examples:
+Απόσπασμα κώδικα
+
+example = function(a,b){ return a+b; };
+example(3,4);
+
+OR
+Απόσπασμα κώδικα
+
+example2 = (function(a,b){ return a+b; })(3,4);
+
+11. break, continue, return
+
+It is not necessary to check these in this phase; they will be checked in the next phase. You may implement them now if you wish.
+12. Conflicts
+
+Requirements:
+
+    You must fix the grammar so that no conflicts exist.
+
+    Exception: The if-else dangling conflict is allowed.
+
+    The Alpha grammar must not be structurally altered.
+
+13. Grammar Queries
+
+IF with an empty body
+Example:
+Απόσπασμα κώδικα
+
+if(5);
+
+The rule:
+ifstmt → if (expr) stmt
+
+Check:
+
+    5 → NUMBER → const → primary → term → expr (OK)
+
+    ; → stmt (OK)
+
+Therefore:
+The expression is syntactically acceptable.
+Summary of Tasks:
+
+    Implement the grammar.
+
+    Manage scopes.
+
+    Implement the symbol table.
+
+    Perform correct lookup.
+
+Note: You are not examining full execution semantics yet.
+
+
+
+Rules:
+
+local x
+
+    Lookup in the SymbolTable: Perform a search specifically within the current scope.
+
+    If a symbol is found: (Whether it is a variable or a function), we refer to that existing entry.
+
+    If nothing is found: * First, check for a collision with a library function.
+
+        If no collision exists, add a new variable to the SymbolTable in the current scope.
+
+    Special Case (Scope 0): If you are currently in Scope 0, the variable is declared as global (the local keyword is effectively ignored).
+
+
+::x (global x)
+
+    Lookup in the SymbolTable: Perform a search strictly within the global scope (Scope 0).
+
+    If a symbol is found: (Whether it is a variable or a function), we refer to that existing entry.
+
+    If not found: It results in a compile-time error.
+
+    Constraint: The ::x operator never performs an insertion into the SymbolTable.
+
+
+x (variable x)
+
+    Perform lookup in the SymbolTable starting from the current scope and going up to the global scope.
+
+        The search is conducted from the innermost to the outermost scope.
+
+    If nothing is found in any scope, then we add a new variable to the SymbolTable in the current scope.
+
+    If something is found in any scope (either a variable or a function), we refer to that and then determine if we have access to the symbol.
+
+
+Symbol Accessibility
+
+    All visible symbols defined either within the current scope or in an outer scope, provided there is no intervening function, are accessible.
+
+        For example, if we are inside a function and refer to a local variable or formal argument of an encompassing function, we do not have access.
+
+    All visible functions, both in the current scope and in outer ones, are visible (regardless of whether a function intervenes or not).
+
+    All global variables (at scope 0) and library functions are accessible.
+
+
+funcdef – function f(…) {}
+
+    If the function does not have a name, we assign it a unique name that cannot be given by the user (e.g., _f1, $f2, etc.).
+
+        Otherwise, it is entered into the SymbolTable normally.
+
+    Perform lookup in the current scope.
+
+    If a variable or function is found, it is an error.
+
+    If there is a collision with a library function, it is an error.
+
+    Otherwise, we insert a new function into the current scope.
+
+    Only this rule declares functions.
+
+        Note: in x(1);, x is not a function but a variable!
+
+
+formal arguments – function f(x) {}
+
+    Perform lookup in the current scope (the scope of the function being declared).
+
+    If anything is found, it is an error.
+
+    If there is a collision with a library function, it is an error.
+
+    Otherwise, we insert a new formal argument into the current scope.
+
+
+Functions (whether user-defined or library) are constants and cannot change their value.
+
+    Consequently, for a function f, actions such as the following are forbidden:
+
+        f = 1, ++f, f--
+
+    In the lvalue rule (lvalue → id), where we perform the lookup and find, for example, that we are referring to a function, we do not yet know the mode of use.
+
+        It could be the error f = 1.
+
+        But it could also be the correct f(1).
+
+    The check is performed in the individual rules and not in the lvalue rule.
+
+        In the lvalue → id rule, we simply store the information of the symbol we found in $$.
+
+        We need to add the appropriate type to the yacc union:
+
+        %union { SymbolTableEntry* exprNode; … } 
+        %type <exprNode> lvalue
+
+        Later, during the use of the lvalue, we use the stored symbol to check the mode of use.
+
+        For example, in assignexpr → lvalue '=' expr, if the symbol contained in $1 is a function, we issue the appropriate error message.
+
+
+
+"
+
+
+The first prompt is a translation of the second phase instructions, second phase FAQ and TA Lecture 3.
+
+
+
+The next prompts of the first chat, which were unfortunately lost, were about fixing a lot of bugs and misinterpretations of the AI.
+
+
+At first it didn't even compile, it had a lot of bugs. But we prompted the bugs and the AI gradually started reducing them.
+
+After eventually compiling the program without errors or warnings, it started printing the reductions which we don't care to print and printed the symbol table with wrong scope management and wrong line counting. We prompted it to fix it. Also we prompted it to not create a separate scanner and make our scanner from phase one to be passed to the parser.y without changing any implementation of the scanner. We also prompted it to have a correct output format despite the fact that the first prompt had shown it.
+
+We tested the examples of the phase 2 instructions, such as:
+
+{
+y = 1;
+function ex(a){
+y = 3; // ERROR
+}
+}
+
+Error:
+Variable y is not accessible inside function ex.
+
+
+The above example initially didn't work, variable y was accessible, but we prompted the AI to fix it.
+
+
+
+
+The next session, we had the second chat, which was fortunately saved. Below are the prompts of the second chat:
+
+
+- The first prompt of the first chat, plus:
+  "
+
+	However this doesn't work correctly on this input:
+
+
+
+	function G(){
+
+	       function F(){
+
+		               return G();  
+
+	       }
+
+	}
+
+	return G();    //Use of 'return' while not in a function
+
+	break;        //Use of 'break' while not in a loop
+
+	continue;    //Use of 'continue' while not in a loop
+
+	// Break / Continue / Return in scope != 0
+
+	{
+
+	    {
+
+		{
+
+		    return G();
+
+		    break;
+
+		    continue;
+
+		}
+
+	    }
+
+	}
+
+
+	And also on this input:
+
+
+	function foo(){
+
+	   x=0;
+
+	}
+
+	foo = 4;    //Using ProgramFunc as an lvalue
+
+	print = foo;    //Using LibFunc as an lvalue
+
+	++print;    //Using LibFunc as an lvalue
+
+	foo--;        //Using ProgramFunc as an lvalue 
+ "
+
+
+- " give me the entire files with these changes, without changing anything else, because everything else is working, apart from these errors "
+
+
+- "why did you add the parsing process? I told you to not change anything besides the error handling of using functions as lvalues"
+
+- " input:
+
+	//
+
+	function f(){
+	       local f=10;
+	       function g(){
+	               f=5;            //Error : Cannot access 'f' inside function 'g'
+	               return f();     //Error : Cannot access 'f' inside function 'g'
+	       }
+	}
+
+	output:
+
+	Error at line 6: Variable 'f' is not accessible inside function.
+	Error at line 7: Variable 'f' is not accessible inside function.
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"f" [user function] (line 3) (scope 0)
+
+	-----------    Scope #1    -----------
+	"f" [local variable] (line 4) (scope 1)
+	"g" [user function] (line 5) (scope 1)
+
+
+	I want you to specify in which function a variable is not accessible,
+
+	For example:
+	 //Error : Cannot access 'f' inside function 'g'            
+
+	"
+	
+- " why is token struct both in lexer and scanner "
+
+- " yes why is token struct in parser and scanner "
+
+- " do the changes for me "
+
+- "give me the parser.y too"
+
+- " input:
+
+	//
+
+	function f(x) {
+	    function x(y){}        //Error: Variable 'x' already defined at line: 3
+	}
+
+	output:
+
+	Error at line 4: Symbol 'x' is already defined in the current scope.
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"f" [user function] (line 3) (scope 0)
+
+	-----------    Scope #1    -----------
+	"x" [formal argument] (line 3) (scope 1)
+
+	-----------    Scope #2    -----------
+	"y" [formal argument] (line 4) (scope 2)
+
+
+	I want the line to be specified like this.
+
+	 //Error: Variable 'x' already defined at line: 3
+
+
+     "
+
+- " input:
+
+	//
+
+	function f(){
+	       function f(){}
+	       function f(){}    //Error: Collision with function named 'f' defined at line 4
+	}
+
+
+	output:
+
+	Error at line 5: Symbol 'f' already defined at line: 4
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"f" [user function] (line 3) (scope 0)
+
+	-----------    Scope #1    -----------
+	"f" [user function] (line 4) (scope 1)
+
+
+	I want the symbol to be specified as what it is (function, variable, etc)
+
+   "
+
+
+-  " input:
+
+	function foo(print,input){    //Collision with 'print' library function, //Collision with 'input' library function
+	   print(geia);
+	}
+
+	function print() {        //User function 'print', collision with 'print' library function
+	}
+
+
+	function F() {
+	   local print;                 //Collision with 'print' library function.
+	}
+
+	output:
+
+	Error at line 1: Formal argument 'print' collides with a library function.
+	Error at line 1: Formal argument 'input' collides with a library function.
+	Error at line 5: Collision with library function named 'print' defined at line 0
+	Error at line 10: local 'print' collides with a library function.
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"foo" [user function] (line 1) (scope 0)
+	"F" [user function] (line 9) (scope 0)
+
+	-----------    Scope #1    -----------
+	"geia" [local variable] (line 2) (scope 1)
+
+
+
+	Don't specify that a library function is defined at line 0. Just say library function.
+	
+   "
+
+
+- " input:
+
+	// 
+
+	function G(){
+	       function F(){
+	                       return G();  
+	       }
+	}
+	return G();    //Use of 'return' while not in a function
+	break;        //Use of 'break' while not in a loop
+	continue;    //Use of 'continue' while not in a loop
+	// Break / Continue / Return in scope != 0
+	{
+	    {
+	        {
+	            return G();
+	            break;
+	            continue;
+	        }
+	    }
+	}
+
+	output:
+
+	Error at line 8: Use of 'return' while not in a function.
+	Error at line 9: Use of 'break' while not in a loop.
+	Error at line 10: Use of 'continue' while not in a loop.
+	Error at line 15: Use of 'return' while not in a function.
+	Error at line 16: Use of 'break' while not in a loop.
+	Error at line 17: Use of 'continue' while not in a loop.
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"G" [user function] (line 3) (scope 0)
+
+	-----------    Scope #1    -----------
+	"F" [user function] (line 4) (scope 1)
+
+
+	The errors at line 15, 16 and 17 are not actually errors because they are in a scope > 0.
+	
+   "
+   
+   
+-  " input:
+
+	//Grammar error: Function call is not lvalue
+	print()    = 2;
+	function test() { }
+	test()    = 2;
+
+	output:
+
+	Syntax Error at line 2: syntax error
+	Syntax Error at line 4: syntax error
+
+	-----------    Scope #0    -----------
+	"print" [library function] (line 0) (scope 0)
+	"input" [library function] (line 0) (scope 0)
+	"objectmemberkeys" [library function] (line 0) (scope 0)
+	"objecttotalmembers" [library function] (line 0) (scope 0)
+	"objectcopy" [library function] (line 0) (scope 0)
+	"totalarguments" [library function] (line 0) (scope 0)
+	"argument" [library function] (line 0) (scope 0)
+	"typeof" [library function] (line 0) (scope 0)
+	"strtonum" [library function] (line 0) (scope 0)
+	"sqrt" [library function] (line 0) (scope 0)
+	"cos" [library function] (line 0) (scope 0)
+	"sin" [library function] (line 0) (scope 0)
+	"test" [user function] (line 3) (scope 0)
+
+
+	Specify the syntax errors
+  "
+  
+  
+- " i want the parser to specify all syntax errors "
+
+
+- " i don't want verbose reporting. I just want specific syntax errors shown before they symbol table when syntax errors are found "
+
+- " what about syntax errors like when ; is missing? You need to print syntax errors based on errors found when doing reductions "
+
+- " will reductions be printed before the symbol table? "
+
+- " if there are no errors, will anything be printed before the symbol table? "
+
+- " okay, so remove the explicit syntax rules "
+
+
+
+
+
+
+
+
+
+
+
+
