@@ -39,7 +39,6 @@ expr* do_uminus(expr* e, int line);
 expr* do_preincdec(expr* lval, int isInc, int line);
 expr* do_postincdec(expr* lval, int isInc, int line);
 
-#endif
 
 /* ---- object/table construction ---- */
 /* elems is a NULL-terminated array of value exprs (source order);
@@ -106,3 +105,8 @@ void     while_pop(void);
 
 /* source filename for compiler-warning lines (set by main) */
 void set_source_file(const char* p);
+
+/* current formal-argument count for the function being defined */
+unsigned formalarg_count(void);
+
+#endif

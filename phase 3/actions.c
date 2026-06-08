@@ -390,3 +390,5 @@ unsigned while_get_start(void){ return whilestk[whilestk_top-1].start; }
 void     while_set_exit(unsigned q){ whilestk[whilestk_top-1].exitj=q; }
 unsigned while_get_exit(void){ return whilestk[whilestk_top-1].exitj; }
 void     while_pop(void){ if(whilestk_top>0) whilestk_top--; }
+
+unsigned formalarg_count(void) { return formalArgCounter; }
