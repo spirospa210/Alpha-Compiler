@@ -103,3 +103,6 @@ unsigned while_get_start(void);
 void     while_set_exit(unsigned q);
 unsigned while_get_exit(void);
 void     while_pop(void);
+
+/* source filename for compiler-warning lines (set by main) */
+void set_source_file(const char* p);

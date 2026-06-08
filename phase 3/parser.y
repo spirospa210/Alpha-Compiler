@@ -433,7 +433,12 @@ funcdef:
           loopcount_save[loopcount_save_top++] = loop_counter;
           loop_counter = 0;
       }
-      '(' idlist ')' block {
+      '(' idlist ')' {
+          /* record formal-argument count before parsing the (possibly
+             nested-function-containing) body resets the formal counter */
+          if ($2) $2->totalFormals = formalarg_count();
+      }
+      block {
           /* restore loop counter, emit funcend */
           loop_counter = loopcount_save[--loopcount_save_top];
           do_funcend($2, yylineno);
@@ -719,6 +724,7 @@ int main(int argc, char** argv) {
     }
 
     /* PHASE 1: Build the token list using your Flex scanner */
+    set_source_file(argv[1]);
     alpha_yylex(NULL);
 
     /* Set the parser pointer to the start of your generated list */

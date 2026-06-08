@@ -5,6 +5,16 @@
 
 int act_current_scope = 0;
 
+/* source filename for [COMPILER WARNING] lines; set by main() */
+const char* g_source_file = "input";
+void set_source_file(const char* p){ if(p) g_source_file = p; }
+
+static void warn(const char* body, int line){
+    char buf[512];
+    snprintf(buf, sizeof(buf), "[COMPILER WARNING] - %s | %s:%d", body, g_source_file, line);
+    add_compiler_warning(buf);
+}
+
 /* ---- value coercion: materialize a boolexpr into a temp ---- */
 expr* to_value(expr* e, int line) {
     if (e == NULL) return NULL;
@@ -34,13 +44,11 @@ expr* do_arith(iopcode op, expr* a, expr* b, int line) {
             case sub_op: r = x - y; break;
             case mul_op: r = x * y; break;
             case div_op:
-                if (y == 0) { fprintf(stderr,
-                    "[COMPILER WARNING] - division with 0 (when evaluating division with constants) | line %d\n", line);
+                if (y == 0) { warn("division with 0 (when evaluating division with constants)", line);
                     return newexpr_constnum(0); }
                 r = x / y; break;
             case mod_op:
-                if (y == 0) { fprintf(stderr,
-                    "[COMPILER WARNING] - division with 0 (when evaluating division with constants) | line %d\n", line);
+                if (y == 0) { warn("division with 0 (when evaluating division with constants)", line);
                     return newexpr_constnum(0); }
                 r = (double)(((long long)x) % ((long long)y)); break;
             default: break;
@@ -48,7 +56,7 @@ expr* do_arith(iopcode op, expr* a, expr* b, int line) {
         return newexpr_constnum(r);
     }
     if ((op == div_op || op == mod_op) && b && b->type == constnum_e && b->numConst == 0)
-        fprintf(stderr, "[COMPILER WARNING] - division with 0 | line %d\n", line);
+        warn("division with 0", line);
 
     expr* res = newexpr(arithexpr_e);
     res->sym = newtemp(line, act_current_scope);
@@ -201,6 +209,27 @@ expr* do_objectdef_indexed(expr** keys, expr** vals, int n, int line) {
 
 /* ---- calls ---- */
 expr* do_call(expr* callee, expr** args, int n, int line) {
+    /* arity check for user functions (compiler warning, optional per spec) */
+    if (callee && callee->sym && callee->sym->type == USER_FUNC) {
+        unsigned expected = callee->sym->totalFormals;
+        if ((unsigned)n != expected) {
+            char body[256];
+            snprintf(body, sizeof(body),
+                     "Function %s called with %d arguments, expected %u",
+                     callee->sym->name, n, expected);
+            char full[384];
+            snprintf(full, sizeof(full), "%s", body);
+            extern void add_compiler_warning(const char*);
+            /* route through warn() style with filename:line */
+            {
+                extern const char* g_source_file;
+                char line_msg[512];
+                snprintf(line_msg, sizeof(line_msg),
+                         "[COMPILER WARNING] - %s | %s:%d", full, g_source_file, line);
+                add_compiler_warning(line_msg);
+            }
+        }
+    }
     for (int i = n - 1; i >= 0; i--) {
         expr* a = to_value(args[i], line);
         emit(param_op, a, NULL, NULL, 0, line);

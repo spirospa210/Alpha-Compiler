@@ -219,9 +219,23 @@ static void expr_to_str(expr* e, char* buf, size_t n) {
     }
 }
 
+/* ---- buffered compiler warnings (printed at top of quads.txt) ---- */
+#define MAX_WARNINGS 4096
+static char* warnings[MAX_WARNINGS];
+static int   warning_count = 0;
+
+void add_compiler_warning(const char* msg) {
+    if (warning_count < MAX_WARNINGS)
+        warnings[warning_count++] = strdup(msg);
+}
+
 void write_quads_to_file(const char* filename) {
     FILE* f = fopen(filename, "w");
     if (!f) { perror("quads.txt"); return; }
+
+    /* compiler warnings first, in the order they were produced */
+    for (int w = 0; w < warning_count; w++)
+        fprintf(f, "%s\n", warnings[w]);
 
     /* Header column starts: quad#=0 opcode=8 result=24 arg1=40 arg2=61
      * label=82 line=93  -> field widths 8,16,16,21,21,11,(rest). */

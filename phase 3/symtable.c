@@ -50,6 +50,7 @@ SymbolTableEntry* insert_symbol(char* name, SymbolType type, int line, int scope
     new_entry->space       = PROGRAM_SCOPE;
     new_entry->offset      = 0;
     new_entry->totalLocals = 0;
+    new_entry->totalFormals = 0;
     new_entry->iaddress    = 0;
     new_entry->isTemp      = false;
     

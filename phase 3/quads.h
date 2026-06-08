@@ -115,7 +115,8 @@ void            backpatch(stmt_list_node* list, unsigned label);
 /* ---- output ---- */
 void write_quads_to_file(const char* filename);
 
-/* ---- compiler warnings (printed to stderr, non-fatal) ---- */
+/* ---- compiler warnings (buffered, written to quads.txt before quads) ---- */
+void add_compiler_warning(const char* msg);
 void icode_phase_succeeded(void);
 
 #endif

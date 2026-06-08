@@ -44,6 +44,7 @@ typedef struct SymbolTableEntry {
     ScopeSpace space;        /* which scope-space this symbol lives in   */
     unsigned   offset;       /* order of appearance within that space    */
     unsigned   totalLocals;  /* (functions) number of local variables    */
+    unsigned   totalFormals; /* (functions) number of formal arguments   */
     unsigned   iaddress;     /* (functions) quad index of its funcstart  */
     bool       isTemp;       /* true for compiler-generated temporaries  */
 } SymbolTableEntry;
