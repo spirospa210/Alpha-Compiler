@@ -25,6 +25,11 @@ int func_scope_stack_top = 0;
 
 int loop_counter = 0;
 
+/* PHASE 3: count all errors (syntax + semantic). quads.txt is written
+ * only when this stays 0 through a successful parse. */
+int error_count = 0;
+#define SEMERR() (error_count++)
+
 char* new_anon_func_name();
 int get_bison_token(struct token* t);
 int yylex();
@@ -111,7 +116,8 @@ stmt:
     | BREAK ';' {
           if (loop_counter == 0 && current_scope == 0) {
               printf("Error at line %d: Use of 'break' while not in a loop.\n", yylineno);
-          } else {
+              error_count++;
+          } else if (loop_counter > 0) {
               unsigned q = nextquadlabel();
               emit(jump_op, NULL, NULL, NULL, 0, yylineno);
               loop_add_break(q);
@@ -120,7 +126,8 @@ stmt:
     | CONTINUE ';' {
           if (loop_counter == 0 && current_scope == 0) {
               printf("Error at line %d: Use of 'continue' while not in a loop.\n", yylineno);
-          } else {
+              error_count++;
+          } else if (loop_counter > 0) {
               unsigned q = nextquadlabel();
               emit(jump_op, NULL, NULL, NULL, 0, yylineno);
               loop_add_continue(q);
@@ -159,24 +166,28 @@ term:
     | PLUS_PLUS lvalue {
           if ($2 && ($2->sym) && ($2->sym->type == USER_FUNC || $2->sym->type == LIB_FUNC)) {
               printf("Error at line %d: Cannot apply '++' to function '%s'.\n", yylineno, $2->sym->name);
+              error_count++;
               $$ = $2;
           } else { $$ = do_preincdec($2, 1, yylineno); }
       }
     | lvalue PLUS_PLUS {
           if ($1 && ($1->sym) && ($1->sym->type == USER_FUNC || $1->sym->type == LIB_FUNC)) {
               printf("Error at line %d: Cannot apply '++' to function '%s'.\n", yylineno, $1->sym->name);
+              error_count++;
               $$ = $1;
           } else { $$ = do_postincdec($1, 1, yylineno); }
       }
     | MINUS_MINUS lvalue {
           if ($2 && ($2->sym) && ($2->sym->type == USER_FUNC || $2->sym->type == LIB_FUNC)) {
               printf("Error at line %d: Cannot apply '--' to function '%s'.\n", yylineno, $2->sym->name);
+              error_count++;
               $$ = $2;
           } else { $$ = do_preincdec($2, 0, yylineno); }
       }
     | lvalue MINUS_MINUS {
           if ($1 && ($1->sym) && ($1->sym->type == USER_FUNC || $1->sym->type == LIB_FUNC)) {
               printf("Error at line %d: Cannot apply '--' to function '%s'.\n", yylineno, $1->sym->name);
+              error_count++;
               $$ = $1;
           } else { $$ = do_postincdec($1, 0, yylineno); }
       }
@@ -187,6 +198,7 @@ assignexpr:
       lvalue '=' expr {
           if ($1 && $1->sym && ($1->sym->type == USER_FUNC || $1->sym->type == LIB_FUNC)) {
               printf("Error at line %d: Cannot assign to function '%s'.\n", yylineno, $1->sym->name);
+              error_count++;
               $$ = $1;
           } else {
               $$ = do_assign($1, $3, yylineno);
@@ -212,6 +224,7 @@ lvalue:
                       if (sym->scope < closest_func_scope) {
                           printf("Error at line %d: Cannot access '%s' inside function '%s'.\n",
                                  yylineno, $1, current_func_name_stack[func_scope_stack_top - 1]);
+              error_count++;
                       }
                   }
               }
@@ -229,6 +242,7 @@ lvalue:
           SymbolTableEntry* lib_collision = lookup_scope($2, 0);
           if (lib_collision && lib_collision->type == LIB_FUNC) {
               printf("Error at line %d: local '%s' collides with a library function.\n", yylineno, $2);
+              error_count++;
               $$ = sym2expr(lib_collision);
           } else {
               if (!sym) {
@@ -245,6 +259,7 @@ lvalue:
           SymbolTableEntry* sym = lookup_scope($2, 0);
           if (!sym) {
               printf("Error at line %d: Global variable '%s' not found.\n", yylineno, $2);
+              error_count++;
           }
           $$ = sym2expr(sym);
       }
@@ -371,13 +386,16 @@ funcname:
           if (collision) {
               if (collision->type == LIB_FUNC) {
                   printf("Error at line %d: Function name '%s' collides with a library function.\n", yylineno, $1);
+              error_count++;
               } else {
                   printf("Error at line %d: Collision with %s named '%s' defined at line %d\n",
                          yylineno, get_symbol_type_string(collision->type), $1, collision->line);
+              error_count++;
               }
               fsym = collision;
           } else if (lib_collision && lib_collision->type == LIB_FUNC) {
               printf("Error at line %d: Function name '%s' collides with a library function.\n", yylineno, $1);
+              error_count++;
               fsym = lib_collision;
           } else {
               fsym = insert_symbol($1, USER_FUNC, yylineno, current_scope);
@@ -446,12 +464,15 @@ id_seq:
           if (collision) {
               if (collision->type == LIB_FUNC) {
                   printf("Error at line %d: Formal argument '%s' collides with a library function.\n", yylineno, $3);
+              error_count++;
               } else {
                   printf("Error at line %d: Formal argument '%s' collides with %s defined at line %d\n",
                          yylineno, $3, get_symbol_type_string(collision->type), collision->line);
+              error_count++;
               }
           } else if (lib_collision && lib_collision->type == LIB_FUNC) {
               printf("Error at line %d: Formal argument '%s' collides with a library function.\n", yylineno, $3);
+              error_count++;
           } else {
               SymbolTableEntry* a = insert_symbol($3, FORMAL_ARG, yylineno, current_scope);
               a->space = FORMAL_ARGUMENT;
@@ -464,12 +485,15 @@ id_seq:
           if (collision) {
               if (collision->type == LIB_FUNC) {
                   printf("Error at line %d: Formal argument '%s' collides with a library function.\n", yylineno, $1);
+              error_count++;
               } else {
                   printf("Error at line %d: Formal argument '%s' collides with %s defined at line %d\n",
                          yylineno, $1, get_symbol_type_string(collision->type), collision->line);
+              error_count++;
               }
           } else if (lib_collision && lib_collision->type == LIB_FUNC) {
               printf("Error at line %d: Formal argument '%s' collides with a library function.\n", yylineno, $1);
+              error_count++;
           } else {
               SymbolTableEntry* a = insert_symbol($1, FORMAL_ARG, yylineno, current_scope);
               a->space = FORMAL_ARGUMENT;
@@ -561,14 +585,16 @@ returnstmt:
       RETURN expr ';' {
           if (func_scope_stack_top == 0 && current_scope == 0) {
               printf("Error at line %d: Use of 'return' while not in a function.\n", yylineno);
-          } else {
+              error_count++;
+          } else if (func_scope_stack_top > 0) {
               do_return($2, yylineno);
           }
       }
     | RETURN ';' {
           if (func_scope_stack_top == 0 && current_scope == 0) {
               printf("Error at line %d: Use of 'return' while not in a function.\n", yylineno);
-          } else {
+              error_count++;
+          } else if (func_scope_stack_top > 0) {
               do_return(NULL, yylineno);
           }
       }
@@ -578,6 +604,7 @@ returnstmt:
 
 void yyerror(const char* s) {
     fprintf(stderr, "Syntax Error at line %d: %s\n", yylineno, s);
+    error_count++;
 }
 
 char* new_anon_func_name() {
@@ -704,8 +731,13 @@ int main(int argc, char** argv) {
     
     print_symtable();
 
-    /* PHASE 3: write intermediate code on successful parse */
-    write_quads_to_file("quads.txt");
+    /* PHASE 3: write intermediate code ONLY on a fully successful parse
+     * (no syntax errors and no semantic errors). */
+    if (error_count == 0) {
+        write_quads_to_file("quads.txt");
+    } else {
+        fprintf(stderr, "Compilation produced %d error(s); quads.txt not generated.\n", error_count);
+    }
 
     if (yyin) {
         fclose(yyin);

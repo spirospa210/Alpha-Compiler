@@ -282,8 +282,8 @@ void loop_enter(void) {
 }
 stmt_list_node* loop_breaklist(void){ return lframes[lframes_top-1].brk; }
 stmt_list_node* loop_contlist(void){ return lframes[lframes_top-1].cont; }
-void loop_add_break(unsigned q){ lframes[lframes_top-1].brk = merge_list(lframes[lframes_top-1].brk, makelist(q)); }
-void loop_add_continue(unsigned q){ lframes[lframes_top-1].cont = merge_list(lframes[lframes_top-1].cont, makelist(q)); }
+void loop_add_break(unsigned q){ if (lframes_top>0) lframes[lframes_top-1].brk = merge_list(lframes[lframes_top-1].brk, makelist(q)); }
+void loop_add_continue(unsigned q){ if (lframes_top>0) lframes[lframes_top-1].cont = merge_list(lframes[lframes_top-1].cont, makelist(q)); }
 void loop_exit(void){ lframes_top--; }
 
 /* ---- elist-based call/object wrappers ---- */
