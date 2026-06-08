@@ -114,20 +114,20 @@ stmt:
     | forstmt
     | returnstmt
     | BREAK ';' {
-          if (loop_counter == 0 && current_scope == 0) {
+          if (loop_counter == 0) {
               printf("Error at line %d: Use of 'break' while not in a loop.\n", yylineno);
               error_count++;
-          } else if (loop_counter > 0) {
+          } else {
               unsigned q = nextquadlabel();
               emit(jump_op, NULL, NULL, NULL, 0, yylineno);
               loop_add_break(q);
           }
       }
     | CONTINUE ';' {
-          if (loop_counter == 0 && current_scope == 0) {
+          if (loop_counter == 0) {
               printf("Error at line %d: Use of 'continue' while not in a loop.\n", yylineno);
               error_count++;
-          } else if (loop_counter > 0) {
+          } else {
               unsigned q = nextquadlabel();
               emit(jump_op, NULL, NULL, NULL, 0, yylineno);
               loop_add_continue(q);
@@ -588,18 +588,18 @@ forstmt:
 
 returnstmt:
       RETURN expr ';' {
-          if (func_scope_stack_top == 0 && current_scope == 0) {
+          if (func_scope_stack_top == 0) {
               printf("Error at line %d: Use of 'return' while not in a function.\n", yylineno);
               error_count++;
-          } else if (func_scope_stack_top > 0) {
+          } else {
               do_return($2, yylineno);
           }
       }
     | RETURN ';' {
-          if (func_scope_stack_top == 0 && current_scope == 0) {
+          if (func_scope_stack_top == 0) {
               printf("Error at line %d: Use of 'return' while not in a function.\n", yylineno);
               error_count++;
-          } else if (func_scope_stack_top > 0) {
+          } else {
               do_return(NULL, yylineno);
           }
       }
