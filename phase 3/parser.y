@@ -70,7 +70,7 @@ static expr* sym2expr(symbol* s) { return s ? lvalue_expr(s) : NULL; }
 %token AND OR NOT GLOBAL_SCOPE PLUS_PLUS MINUS_MINUS EQUAL_EQUAL NOT_EQUAL GREATER_EQUAL LESS_EQUAL DOT_DOT
 
 %type <exprNode> expr term assignexpr primary const objectdef call lvalue member
-%type <exprNode> elist expr_list
+%type <exprNode> elist expr_list funcdef
 %type <callNode> callsuffix normcall methodcall
 %type <symNode>  funcname
 %type <quadLabel> ifprefix elseprefix
